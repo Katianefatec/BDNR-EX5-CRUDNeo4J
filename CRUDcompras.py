@@ -1,6 +1,6 @@
 from connect_database import driver
 from CRUDusuario import create_usuario
-from CRUDproduto import list_produtos_indexados
+# from CRUDproduto import list_produtos_indexados
 
 def cadastrar_endereco(cpf_usuario):
     print("Cadastro de novo endereço.")

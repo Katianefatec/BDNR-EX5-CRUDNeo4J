@@ -47,18 +47,15 @@ while True:
     elif (key == '3'):
         print("Menu do Produto")  
         print("1-Criar Produto")
-        print("2-Listar Produto")    
-        print("3-Atualizar Produto")
+        print("2-Listar Produto")            
         sub = input("Digite a opção desejada? (V para voltar) ")
         if (sub == '1'):
             print("Criar produto")
             CRUDproduto.create_produto()
             
         elif (sub == '2'):           
-            CRUDproduto.read_produto()
+            CRUDproduto.read_produto()       
         
-        elif (sub == '3'):            
-            CRUDproduto.update_produto()
           
 
     elif key == '4':
