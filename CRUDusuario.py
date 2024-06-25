@@ -1,4 +1,3 @@
-from astrapy.collection import Collection
 from connect_database import db
 
 def input_with_cancel(prompt, cancel_keyword="CANCELAR", cancel_on_n_for_specific_prompt=False):

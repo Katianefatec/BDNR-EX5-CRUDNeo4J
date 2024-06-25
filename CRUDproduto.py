@@ -1,5 +1,4 @@
 from connect_database import db
-from astrapy.collection import Collection
 from CRUDusuario import input_with_cancel
 
 

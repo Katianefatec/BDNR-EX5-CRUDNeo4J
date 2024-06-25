@@ -1,5 +1,4 @@
 from connect_database import db
-from astrapy.collection import Collection
 from CRUDusuario import create_usuario
 from CRUDproduto import list_produtos_indexados
 
