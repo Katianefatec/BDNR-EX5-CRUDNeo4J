@@ -1,37 +1,34 @@
-from connect_database import db
+from connect_database import driver
 from CRUDusuario import input_with_cancel
 
 def create_vendedor():
     print("\nInserindo um novo vendedor")
-    nome = input_with_cancel("Nome")
+    nome = input_with_cancel("Nome do vendedor: ")
     if nome is None: return
 
-    sobrenome = input_with_cancel("Sobrenome")
+    sobrenome = input_with_cancel("Sobrenome do vendedor: ")
     if sobrenome is None: return
-    
-    cpf = input_with_cancel("CPF")
-    if cpf is None or cpf.strip() == "":
-        print("CPF é obrigatório.")
-        return
 
-    # Verificar se já existe um vendedor com o mesmo CPF
-    collection: Collection = db.get_collection("vendedor")
-    existing_vendedor = collection.find_one({"cpf": cpf})
-    if existing_vendedor:
-        print("Já existe um vendedor cadastrado com este CPF.")
-        return
+    while True:
+        try:
+            cpf = int(input_with_cancel("CPF: "))
+            if cpf < 0:
+                raise ValueError("CPF não pode ser negativo.")
+            break
+        except ValueError as e:
+            print(f"Erro: {e}. Tente novamente.")
 
-    cnpj = input_with_cancel("CNPJ")
-    if cnpj is None: return
+    while True:
+        try:
+            cnpj = int(input_with_cancel("CNPJ: "))
+            if cnpj < 0:
+                raise ValueError("CNPJ não pode ser negativo.")
+            break
+        except ValueError as e:
+            print(f"Erro: {e}. Tente novamente.")
 
-    # Verificar se já existe um vendedor com o mesmo CNPJ
-    existing_vendedor = collection.find_one({"cnpj": cnpj})
-    if existing_vendedor:
-        print("Já existe um vendedor cadastrado com este CNPJ.")
-        return
-
-    # Lista para armazenar os endereços
     enderecos = []
+
     while True:
         print("\nEndereço:")
         rua = input("Rua: ")
@@ -41,7 +38,7 @@ def create_vendedor():
         estado = input("Estado: ")
         cep = input("CEP: ")
 
-        enderecos.append({
+        enderecos.append({  # Adiciona o endereço à lista
             "rua": rua,
             "num": num,
             "bairro": bairro,
@@ -50,83 +47,169 @@ def create_vendedor():
             "cep": cep
         })
 
-        adicionar_outro = input_with_cancel("Deseja cadastrar um novo endereço (S/N)? ", cancel_on_n_for_specific_prompt=True)
+        adicionar_outro = input_with_cancel("Deseja adicionar outro endereço? (S/N): ", cancel_on_n_for_specific_prompt=True)
         if adicionar_outro is None:
-            return  # Cancela a criação do vendedor
+            return  
         elif adicionar_outro.upper() != 'S':
-            break
+            break 
 
-    collection.insert_one(document={"nome": nome, "sobrenome": sobrenome, "cpf": cpf, "cnpj": cnpj, "end": enderecos})
-    print("Vendedor inserido com sucesso.")
-    return cpf
+    print(f"\n{nome} {sobrenome} - {cpf} - {enderecos}")  
+
+    with driver.session() as session:
+        session.write_transaction(
+            _create_vendedor_tx, nome, sobrenome, cpf, cnpj, enderecos 
+        )
+        print("Vendedor inserido com sucesso!")
+
+def _create_vendedor_tx(tx, nome, sobrenome, cpf, cnpj, enderecos):  # Adiciona sobrenome e enderecos
+    query = """
+        CREATE (v:Vendedor {nome: $nome, sobrenome: $sobrenome, cpf: $cpf, cnpj: $cnpj})
+        WITH v
+        UNWIND $enderecos AS endereco
+        CREATE (e:Endereco {rua: endereco.rua, num: endereco.num, bairro: endereco.bairro, 
+                            cidade: endereco.cidade, estado: endereco.estado, cep: endereco.cep})
+        CREATE (v)-[:RESIDE_EM]->(e)
+        """
+    tx.run(query, nome=nome, sobrenome=sobrenome, cpf=cpf, cnpj=cnpj, enderecos=enderecos)
 
 def list_vendedores_indexados():
-    collection: Collection = db.get_collection("vendedor")
-    vendedores = list(collection.find())
+    with driver.session() as session:
+        result = session.run("MATCH (v:Vendedor) RETURN v")
+        vendedores = [record["v"] for record in result]
 
-    if not vendedores:
-        print("Nenhum vendedor encontrado.")
-        return None
+        if not vendedores:
+            print("Nenhum vendedor encontrado.")
+            return None
 
-    print("Vendedores cadastrados:")
-    for i, vendedor in enumerate(vendedores):
-        print(f"{i+1}. CPF: {vendedor['cpf']}, Nome: {vendedor['nome']}")
+        print("Vendedores disponíveis:")
+        for i, vendedor in enumerate(vendedores):
+            print(f"{i+1}. Nome: {vendedor['nome']}, CPF: {vendedor['cpf']}")
 
-    while True:
-        try:
-            index = int(input("Digite o número do vendedor que deseja atualizar: ")) - 1
-            if 0 <= index < len(vendedores):
-                return vendedores[index]['cpf']
-            else:
-                print("Índice inválido. Tente novamente.")
-        except ValueError:
-            print("Entrada inválida. Digite um número.")
+        while True:
+            try:
+                index = int(input("Digite o número do vendedor que deseja: ")) - 1
+                if 0 <= index < len(vendedores):
+                    return vendedores[index]['cpf']  # Retorna o cpf do vendedor selecionado
+                else:
+                    print("Índice inválido. Tente novamente.")
+            except ValueError:
+                print("Entrada inválida. Digite um número.")
 
 def update_vendedor():
-    cpf = list_vendedores_indexados()
-    if cpf is None:
+    cpf_vendedor = list_vendedores_indexados()
+    if cpf_vendedor is None:
         return
 
-    collection: Collection = db.get_collection("vendedor")
-    vendedor = collection.find_one({"cpf": cpf})
+    
+    with driver.session() as session:
+        result = session.run(
+            "MATCH (v:Vendedor {cpf: $cpf}) RETURN v", cpf=cpf_vendedor
+        )
+        vendedor = result.single()["v"] if result.single() else None
 
     if vendedor:
         print("Dados atuais do vendedor:", vendedor)
 
+        
         nome = input_with_cancel(f"Novo nome (ou pressione Enter para manter '{vendedor['nome']}' ): ") or vendedor['nome']
-        sobrenome = input_with_cancel(f"Novo sobrenome (ou pressione Enter para manter '{vendedor['sobrenome']}' ): ") or vendedor['sobrenome']
-        cnpj = input_with_cancel(f"Novo CNPJ (ou pressione Enter para manter '{vendedor['cnpj']}' ): ") or vendedor['cnpj']
+        
+        while True:
+            try:
+                cpf = int(input_with_cancel(f"Novo cpf (ou pressione Enter para manter '{vendedor['cpf']}' ): "))
+                if cpf is not None and cpf < 0:
+                    raise ValueError("CPF não pode ser negativo.")
+                break
+            except ValueError as e:
+                print(f"Erro: {e}. Tente novamente.")
+        cpf = cpf if cpf is not None else vendedor['cpf']
 
-        # ... (lógica para atualizar endereços, semelhante à função update_usuario)
+        while True:
+            try:
+                cnpj = int(input_with_cancel(f"Novo cnpj (ou pressione Enter para manter '{vendedor['cnpj']}' ): "))
+                if cnpj is not None and cnpj < 0:
+                    raise ValueError("CNPJ não pode ser negativo.")
+                break
+            except ValueError as e:
+                print(f"Erro: {e}. Tente novamente.")
+        cnpj = cnpj if cnpj is not None else vendedor['cnpj']
 
-        collection.update_one(
-            {"cpf": cpf},
-            {
-                "$set": {
-                    "nome": nome,
-                    "sobrenome": sobrenome,
-                    "cnpj": cnpj,
-                    # ... (atualização dos endereços)
-                }
-            }
-        )
-        print("Vendedor atualizado com sucesso!")
+        
+        with driver.session() as session:
+            session.write_transaction(
+                _update_vendedor_tx, cpf_vendedor, nome, cpf, cnpj
+            )
+            print("Vendedor atualizado com sucesso!")
     else:
         print("Vendedor não encontrado.")
 
-def read_vendedor(cpf=None):
-    collection: Collection = db.get_collection("vendedor")
+def _update_vendedor_tx(tx, cpf_vendedor, nome, cpf, cnpj):
+    query = """
+        MATCH (v:Vendedor {cpf: $cpf_vendedor})
+        SET v.nome = $nome, v.cpf = $cpf, v.cnpj = $cnpj
+        """
+    tx.run(query, cpf_vendedor=cpf_vendedor, nome=nome, cpf=cpf, cnpj=cnpj)
 
-    if cpf:
-        # Buscar vendedor específico pelo CPF
-        query = {"cpf": cpf}
-        vendedor = collection.find_one(query)
-        if vendedor:
-            print(vendedor)
+def read_vendedor(cpf=None):
+    with driver.session() as session:
+        if cpf:
+            # Buscar vendedor específico pelo CPF e seus endereços
+            result = session.run(
+                """
+                MATCH (v:Vendedor {cpf: $cpf})-[:RESIDE_EM]->(e:Endereco)
+                RETURN v, COLLECT(e) AS enderecos
+                """, cpf=cpf
+            )
+            for record in result:
+                vendedor = record["v"]
+                enderecos = record["enderecos"]
+                print("\nDetalhes do Vendedor:")
+                for chave, valor in vendedor.items():
+                    print(f"{chave}: {valor}")
+                print("Endereços:")
+                for endereco in enderecos:
+                    for chave, valor in endereco.items():
+                        print(f"  {chave}: {valor}")
         else:
-            print("Vendedor não encontrado.")
-    else:
-        # Listar todos os vendedores
-        vendedores = collection.find()
-        for vendedor in vendedores:
-            print(vendedor)
+                # Listar todos os vendedores, mesmo sem endereços
+                result = session.run(
+                    """
+                    MATCH (v:Vendedor)
+                    OPTIONAL MATCH (v)-[:RESIDE_EM]->(e:Endereco)
+                    RETURN v, COLLECT(e) AS enderecos
+                    """
+                )
+                vendedores = [{"vendedor": record["v"], "enderecos": record["enderecos"]} for record in result]
+
+                if not vendedores:
+                    print("Nenhum vendedor encontrado.")
+                    return
+
+                print("Vendedores disponíveis:")
+                for i, data in enumerate(vendedores, start=1):
+                    print(f"{i}. Nome: {data['vendedor']['nome']}")
+
+                while True:
+                    try:
+                        index = int(input("Digite o número do vendedor para ver detalhes: ")) - 1
+                        if 0 <= index < len(vendedores):
+                            vendedor_selecionado = vendedores[index]['vendedor']
+                            enderecos_selecionados = vendedores[index]['enderecos']
+                            print("\nDetalhes do Vendedor:")
+                            for chave, valor in vendedor_selecionado.items():
+                                print(f"{chave}: {valor}")
+
+                            # Verifica se o vendedor possui endereços antes de imprimir
+                            if enderecos_selecionados and enderecos_selecionados[0] is not None:
+                                print("Endereços:")
+                                for endereco in enderecos_selecionados:
+                                    for chave, valor in endereco.items():
+                                        print(f"  {chave}: {valor}")
+                            else:
+                                print("Nenhum endereço cadastrado para este vendedor.")
+
+                            break
+                        else:
+                            print("Índice inválido. Tente novamente.")
+                    except ValueError:
+                        print("Entrada inválida. Digite um número.")
+

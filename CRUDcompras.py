@@ -1,4 +1,4 @@
-from connect_database import db
+from connect_database import driver
 from CRUDusuario import create_usuario
 from CRUDproduto import list_produtos_indexados
 

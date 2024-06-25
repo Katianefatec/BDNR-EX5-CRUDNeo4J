@@ -1,4 +1,4 @@
-from connect_database import db
+from connect_database import driver
 from CRUDusuario import input_with_cancel
 
 
