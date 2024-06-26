@@ -2,6 +2,7 @@ import CRUDusuario
 import CRUDvendedor
 import CRUDproduto
 import CRUDcompras
+from connect_database import driver
 
 
 while True:  
@@ -67,7 +68,7 @@ while True:
 
         if sub == '1':
             cpf_usuario = input("Digite seu CPF: ")
-            carrinho_usuario = CRUDcompras.realizar_compra(cpf_usuario)
+            carrinho_usuario = CRUDcompras.realizar_compra(cpf_usuario, driver)
               
         elif sub == '2':
             cpf_usuario = input("Digite seu CPF: ")
