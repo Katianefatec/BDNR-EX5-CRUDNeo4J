@@ -205,7 +205,7 @@ def ver_compras_realizadas(cpf_usuario):
             """
             MATCH (u:Usuario {cpf: $cpf_usuario})-[:COMPROU]->(c:Compra)-[:CONTEM]->(p:Produto)
             RETURN c, COLLECT(p) AS produtos
-            """, cpf=cpf_usuario
+            """, cpf_usuario=cpf_usuario
         )
 
         for record in result:
